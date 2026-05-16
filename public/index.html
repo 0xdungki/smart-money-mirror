@@ -215,7 +215,7 @@
 
   <div class="section-title" id="kol-section" style="display:none">
     <h2>🎯 KOL Convergence — labeled wallets buying NOW</h2>
-    <div class="legend">2+ KOLs hitting same token in last 48h</div>
+    <div class="legend">2+ KOL buyers, OR single KOL buy &gt; $5K · last 48h</div>
   </div>
   <div class="grid" id="kol-grid" style="display:none"></div>
 
@@ -343,16 +343,16 @@ function renderKolConvergence() {
 
 function renderSummary() {
   const s = DATA.summary;
+  const k = DATA.kolConvergence || {};
   document.getElementById('db-size').textContent = (s.labelDbSize || 0).toLocaleString();
   const cards = [
-    { label: 'Tokens scanned', val: s.totalTokensScanned, cls: '' },
-    { label: 'Total wallets', val: fmt(s.totalWallets, 0), cls: 'info' },
-    { label: 'Labeled hits', val: s.labeledTraders || 0, cls: 'warn' },
-    { label: 'KOL hits', val: s.kolHits || 0, cls: 'warn' },
-    { label: 'Whale hits', val: s.whaleHits || 0, cls: 'warn' },
-    { label: 'Multi-token wallets', val: s.multiTokenWallets, cls: 'info' },
+    { label: 'KOLs tracked', val: k.kolCount || 0, cls: 'warn' },
+    { label: 'KOL trades scanned', val: k.totalTrades || 0, cls: 'warn' },
+    { label: 'Converged tokens', val: k.convergedTokens || 0, cls: 'accent' },
+    { label: 'Trending tokens', val: s.totalTokensScanned, cls: '' },
+    { label: 'Cross-token wallets', val: s.multiTokenWallets, cls: 'info' },
     { label: 'Alpha wallets', val: s.alphaWallets, cls: 'accent' },
-    { label: 'Hot tokens', val: s.hotTokens, cls: 'warn' },
+    { label: 'Label DB size', val: s.labelDbSize || 0, cls: 'info' },
     { label: 'Smart-money PnL', val: fmtUsd(s.totalSmartPnl), cls: 'accent' }
   ];
   document.getElementById('summary').innerHTML = cards.map(c =>
