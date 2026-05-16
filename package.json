@@ -1,0 +1,19 @@
+{
+  "name": "smart-money-mirror",
+  "version": "1.0.0",
+  "description": "Birdeye-powered Solana smart money discovery: find wallets early to rotations by cross-referencing top traders across trending tokens.",
+  "type": "module",
+  "scripts": {
+    "fetch": "node scripts/fetch.js",
+    "build": "node scripts/build.js",
+    "all": "npm run fetch && npm run build",
+    "serve": "npx -y http-server@14 dist -p 4173 -c-1"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  },
+  "engines": { "node": ">=18" }
+}

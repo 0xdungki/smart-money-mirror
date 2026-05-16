@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Smart Money Mirror — Birdeye-powered Solana smart-money tracker</title>
+<meta name="description" content="Find Solana smart-money wallets early to rotation, by cross-referencing top traders across trending tokens. Powered by Birdeye." />
+<style>
+  :root {
+    --bg: #0a0d14;
+    --panel: #121723;
+    --panel-2: #181f2e;
+    --border: #232b3d;
+    --text: #e6edf7;
+    --muted: #8a93a6;
+    --accent: #4dffa6;
+    --warn: #ffc24d;
+    --danger: #ff5c8a;
+    --info: #6dc6ff;
+    --alpha: #4dffa6;
+    --smart: #6dc6ff;
+    --cross: #b88dff;
+    --noise: #5a6378;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif; }
+  body { padding: 0 0 80px; min-height: 100vh; }
+
+  header {
+    padding: 36px 24px 20px;
+    text-align: center;
+    background: radial-gradient(ellipse at top, #1a2238 0%, var(--bg) 60%);
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { margin: 0 0 6px; font-size: 30px; letter-spacing: -0.02em; }
+  header h1 span { background: linear-gradient(90deg, var(--accent), var(--info)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  header p.tag { color: var(--muted); margin: 0 0 12px; font-size: 14px; }
+  header p.built { color: var(--muted); font-size: 12px; margin: 0; }
+  header p.built a { color: var(--info); text-decoration: none; }
+
+  .container { max-width: 1240px; margin: 0 auto; padding: 0 16px; }
+
+  .summary-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin: 24px 0;
+  }
+  .stat {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .stat .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
+  .stat .val { font-size: 22px; font-weight: 600; }
+  .stat.accent .val { color: var(--accent); }
+  .stat.warn .val { color: var(--warn); }
+  .stat.info .val { color: var(--info); }
+
+  .section-title { display: flex; align-items: center; justify-content: space-between; margin: 28px 0 12px; }
+  .section-title h2 { margin: 0; font-size: 18px; letter-spacing: -0.01em; }
+  .section-title .legend { font-size: 11px; color: var(--muted); }
+  .legend-pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; margin-left: 6px; border: 1px solid currentColor; }
+
+  .filter-bar { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 16px; }
+  .pill {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 12px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+  }
+  .pill.active { background: var(--accent); color: #052418; border-color: var(--accent); }
+  input.search {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    width: 240px;
+    font-family: inherit;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+    gap: 14px;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    transition: transform 0.1s, border-color 0.1s;
+  }
+  .card:hover { transform: translateY(-2px); border-color: #364260; }
+  .card.signal-hot { border-color: var(--alpha); box-shadow: 0 0 0 1px rgba(77,255,166,0.18); }
+  .card.signal-warm { border-color: var(--info); }
+  .card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .logo { width: 36px; height: 36px; border-radius: 50%; background: var(--panel-2); object-fit: cover; }
+  .card-head .titles { flex: 1; min-width: 0; }
+  .card-head .sym { font-size: 16px; font-weight: 600; }
+  .card-head .name { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .badge { padding: 2px 8px; border-radius: 999px; font-size: 10px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.06em; }
+  .badge.hot { background: rgba(77,255,166,0.16); color: var(--alpha); }
+  .badge.warm { background: rgba(109,198,255,0.16); color: var(--info); }
+  .badge.cold { background: rgba(138,147,166,0.14); color: var(--muted); }
+
+  .stats-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; font-size: 12px; }
+  .kv { display: flex; justify-content: space-between; }
+  .kv .k { color: var(--muted); }
+  .kv .v { color: var(--text); }
+  .kv .v.up { color: var(--accent); }
+  .kv .v.down { color: var(--danger); }
+
+  .traders-list { margin-top: 8px; }
+  .trader-row {
+    display: grid;
+    grid-template-columns: 12px 1fr auto;
+    gap: 8px;
+    align-items: center;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .trader-row:last-child { border-bottom: none; }
+  .tier-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--noise); margin-left: 2px; }
+  .tier-dot.alpha { background: var(--alpha); box-shadow: 0 0 6px var(--alpha); }
+  .tier-dot.smart { background: var(--smart); }
+  .tier-dot.cross-token { background: var(--cross); }
+  .tier-dot.profit-only { background: var(--warn); }
+  .trader-meta { display: flex; flex-direction: column; min-width: 0; }
+  .trader-addr { font-family: 'SF Mono', ui-monospace, Menlo, monospace; cursor: pointer; color: var(--text); }
+  .trader-addr:hover { color: var(--accent); }
+  .trader-tag { font-size: 10px; color: var(--muted); margin-top: 1px; }
+  .trader-pnl { text-align: right; font-family: 'SF Mono', ui-monospace, Menlo, monospace; }
+  .trader-pnl.up { color: var(--accent); }
+  .trader-pnl.down { color: var(--danger); }
+  .trader-pnl.flat { color: var(--muted); }
+
+  .footer-link { display: flex; gap: 12px; justify-content: space-between; margin-top: 10px; font-size: 11px; }
+  .footer-link a { color: var(--info); text-decoration: none; }
+  .footer-link a:hover { color: var(--accent); }
+  .copy { color: var(--muted); cursor: pointer; }
+  .copy:hover { color: var(--accent); }
+
+  /* Top wallets table */
+  .table-wrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; }
+  table.wallets { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.wallets th, table.wallets td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+  table.wallets th { background: var(--panel-2); color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+  table.wallets td.num { text-align: right; font-family: 'SF Mono', ui-monospace, Menlo, monospace; }
+  table.wallets td .tier-pill { padding: 2px 8px; border-radius: 999px; font-size: 10px; text-transform: uppercase; }
+  table.wallets td .tier-pill.alpha { background: rgba(77,255,166,0.16); color: var(--alpha); }
+  table.wallets td .tier-pill.smart { background: rgba(109,198,255,0.16); color: var(--smart); }
+  table.wallets td .tier-pill.cross-token { background: rgba(184,141,255,0.16); color: var(--cross); }
+  table.wallets td a { color: var(--info); text-decoration: none; }
+  table.wallets tr:hover td { background: rgba(255,255,255,0.02); }
+  table.wallets td .toks { display: flex; gap: 4px; flex-wrap: wrap; }
+  table.wallets td .toks span { background: var(--panel-2); border: 1px solid var(--border); padding: 2px 6px; border-radius: 4px; font-size: 10px; }
+
+  footer.meta { text-align: center; color: var(--muted); margin: 32px 0 0; font-size: 11px; }
+  footer.meta a { color: var(--info); text-decoration: none; }
+
+  @media (max-width: 600px) {
+    header h1 { font-size: 24px; }
+    .stat .val { font-size: 18px; }
+    .grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Smart Money <span>Mirror</span></h1>
+  <p class="tag">Find Solana smart-money wallets early to rotations — cross-referenced from Birdeye top traders across every trending token.</p>
+  <p class="built">Built with <a href="https://birdeye.so" target="_blank" rel="noopener">@birdeye_data</a> API · <a id="repo-link" href="https://github.com/0xdungki/smart-money-mirror" target="_blank" rel="noopener">GitHub</a></p>
+</header>
+
+<div class="container">
+  <div class="summary-row" id="summary"></div>
+
+  <div class="section-title">
+    <h2>Trending tokens — by smart-money signal</h2>
+    <div class="legend">
+      <span class="legend-pill" style="color:var(--alpha)">alpha</span>
+      <span class="legend-pill" style="color:var(--smart)">smart</span>
+      <span class="legend-pill" style="color:var(--cross)">cross-token</span>
+      <span class="legend-pill" style="color:var(--warn)">profit-only</span>
+    </div>
+  </div>
+
+  <div class="filter-bar">
+    <button class="pill active" data-filter="all">All</button>
+    <button class="pill" data-filter="hot">🔥 Hot</button>
+    <button class="pill" data-filter="warm">Warm</button>
+    <button class="pill" data-filter="cold">Cold</button>
+    <input class="search" id="search" placeholder="Search symbol or name…" />
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="section-title">
+    <h2>Top smart-money wallets — multi-token presence</h2>
+    <div class="legend">Higher score = stronger smart money signal</div>
+  </div>
+  <div class="table-wrap">
+    <table class="wallets">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Wallet</th>
+          <th>Tier</th>
+          <th class="num">Score</th>
+          <th class="num">Tokens</th>
+          <th class="num">Total PnL</th>
+          <th class="num">Volume</th>
+          <th>Touched tokens</th>
+        </tr>
+      </thead>
+      <tbody id="wallets-body"></tbody>
+    </table>
+  </div>
+
+  <footer class="meta">
+    Data refreshed: <span id="generated-at">—</span> · Birdeye API: <code>token_trending</code>, <code>v2/tokens/top_traders</code> · Read-only analytics. No wallet, no swaps, no private keys.
+  </footer>
+</div>
+
+<script>
+const fmt = (n, dp = 2) => (n === null || n === undefined || isNaN(n)) ? '—' : Number(n).toLocaleString(undefined, { maximumFractionDigits: dp, minimumFractionDigits: 0 });
+const fmtCompact = (n) => {
+  if (n === null || n === undefined || isNaN(n)) return '—';
+  const a = Math.abs(n);
+  if (a >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+  if (a >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+  if (a >= 1e3) return (n / 1e3).toFixed(2) + 'K';
+  return n.toFixed(2);
+};
+const fmtUsd = (n) => (n === null || n === undefined || isNaN(n)) ? '—' : '$' + fmtCompact(n);
+
+let DATA = null;
+let activeFilter = 'all';
+let searchQ = '';
+
+async function load() {
+  const res = await fetch('data.json?ts=' + Date.now());
+  DATA = await res.json();
+  renderSummary();
+  renderGrid();
+  renderWallets();
+  document.getElementById('generated-at').textContent = new Date(DATA.summary.generatedAt).toLocaleString();
+}
+
+function renderSummary() {
+  const s = DATA.summary;
+  const cards = [
+    { label: 'Tokens scanned', val: s.totalTokensScanned, cls: '' },
+    { label: 'Total wallets', val: fmt(s.totalWallets, 0), cls: 'info' },
+    { label: 'Multi-token wallets', val: s.multiTokenWallets, cls: 'info' },
+    { label: 'Alpha wallets', val: s.alphaWallets, cls: 'accent' },
+    { label: 'Smart wallets', val: s.smartWallets, cls: 'accent' },
+    { label: 'Hot tokens', val: s.hotTokens, cls: 'warn' },
+    { label: 'Warm tokens', val: s.warmTokens, cls: 'warn' },
+    { label: 'Smart-money PnL', val: fmtUsd(s.totalSmartPnl), cls: 'accent' }
+  ];
+  document.getElementById('summary').innerHTML = cards.map(c =>
+    `<div class="stat ${c.cls}"><div class="label">${c.label}</div><div class="val">${c.val}</div></div>`
+  ).join('');
+}
+
+function tokenMatchesFilter(t) {
+  if (activeFilter !== 'all' && t.signal !== activeFilter) return false;
+  if (searchQ) {
+    const q = searchQ.toLowerCase();
+    if (!(t.symbol || '').toLowerCase().includes(q) && !(t.name || '').toLowerCase().includes(q)) return false;
+  }
+  return true;
+}
+
+function renderGrid() {
+  const grid = document.getElementById('grid');
+  const tokens = (DATA.tokens || []).filter(tokenMatchesFilter);
+  if (!tokens.length) { grid.innerHTML = '<div style="color:var(--muted);padding:24px;text-align:center;grid-column:1/-1">No tokens match.</div>'; return; }
+  grid.innerHTML = tokens.map(t => `
+    <div class="card signal-${t.signal}">
+      <div class="card-head">
+        <img class="logo" src="${t.logoURI || ''}" alt="" onerror="this.style.visibility='hidden'" />
+        <div class="titles">
+          <div class="sym">${t.symbol || '?'} <span style="color:var(--muted);font-size:11px;font-weight:400">#${t.rank}</span></div>
+          <div class="name">${(t.name || '').replace(/</g,'&lt;')}</div>
+        </div>
+        <span class="badge ${t.signal}">${t.signal}</span>
+      </div>
+      <div class="stats-2">
+        <div class="kv"><span class="k">Price</span><span class="v">$${fmt(t.price, 6)}</span></div>
+        <div class="kv"><span class="k">24h</span><span class="v ${t.price24hChangePercent >= 0 ? 'up' : 'down'}">${t.price24hChangePercent >= 0 ? '+' : ''}${fmt(t.price24hChangePercent, 1)}%</span></div>
+        <div class="kv"><span class="k">Vol 24h</span><span class="v">${fmtUsd(t.volume24hUSD)}</span></div>
+        <div class="kv"><span class="k">Liq</span><span class="v">${fmtUsd(t.liquidity)}</span></div>
+        <div class="kv"><span class="k">Alpha</span><span class="v" style="color:var(--alpha)">${t.alphaCount}</span></div>
+        <div class="kv"><span class="k">Smart</span><span class="v" style="color:var(--smart)">${t.smartCount}</span></div>
+      </div>
+      <div class="traders-list">
+        ${t.traders.slice(0, 6).map(tr => `
+          <div class="trader-row" title="Score ${tr.score} · ${tr.tradeBuy} buys / ${tr.tradeSell} sells">
+            <span class="tier-dot ${tr.tier}"></span>
+            <div class="trader-meta">
+              <span class="trader-addr" data-addr="${tr.owner}" onclick="copyAddr(this)">${tr.ownerShort}${tr.crossTokens.length ? ' <span class="trader-tag" style="margin-left:4px">also: ' + tr.crossTokens.slice(0, 3).join(', ') + '</span>' : ''}</span>
+            </div>
+            <span class="trader-pnl ${tr.traderPnl > 0 ? 'up' : tr.traderPnl < 0 ? 'down' : 'flat'}">${tr.traderPnl >= 0 ? '+' : ''}${fmtUsd(tr.traderPnl)}</span>
+          </div>
+        `).join('')}
+      </div>
+      <div class="footer-link">
+        <a href="https://birdeye.so/token/${t.address}?chain=solana" target="_blank" rel="noopener">Birdeye →</a>
+        <a href="https://dexscreener.com/solana/${t.address}" target="_blank" rel="noopener">Dexscreener →</a>
+        <span class="copy" data-addr="${t.address}" onclick="copyAddr(this)">Copy CA</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderWallets() {
+  const tbody = document.getElementById('wallets-body');
+  const rows = (DATA.topWallets || []).slice(0, 30);
+  tbody.innerHTML = rows.map((w, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td><a href="https://birdeye.so/profile/${w.owner}?chain=solana" target="_blank" rel="noopener">${w.ownerShort}</a> <span class="copy" data-addr="${w.owner}" onclick="copyAddr(this)" title="Copy wallet">⧉</span></td>
+      <td><span class="tier-pill ${w.tier}">${w.tier}</span></td>
+      <td class="num">${w.score}</td>
+      <td class="num">${w.tokenCount}</td>
+      <td class="num" style="color:${w.totalPnl >= 0 ? 'var(--accent)' : 'var(--danger)'}">${w.totalPnl >= 0 ? '+' : ''}${fmtUsd(w.totalPnl)}</td>
+      <td class="num">${fmtUsd(w.totalVolume)}</td>
+      <td><div class="toks">${w.appearances.map(a => `<span title="${a.symbol} · PnL ${fmtUsd(a.traderPnl)}">${a.symbol}</span>`).join('')}</div></td>
+    </tr>
+  `).join('');
+}
+
+function copyAddr(el) {
+  const a = el.getAttribute('data-addr');
+  if (!a) return;
+  navigator.clipboard.writeText(a);
+  const old = el.textContent;
+  el.textContent = '✓ copied';
+  setTimeout(() => el.textContent = old, 1200);
+}
+
+document.querySelectorAll('.pill').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.pill').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    activeFilter = b.dataset.filter;
+    renderGrid();
+  });
+});
+document.getElementById('search').addEventListener('input', e => { searchQ = e.target.value; renderGrid(); });
+
+load().catch(e => { document.getElementById('grid').innerHTML = '<div style="color:var(--danger);padding:24px;text-align:center;grid-column:1/-1">Failed to load data.json: ' + e.message + '</div>'; });
+</script>
+</body>
+</html>
