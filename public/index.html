@@ -21,6 +21,12 @@
     --smart: #6dc6ff;
     --cross: #b88dff;
     --noise: #5a6378;
+    --kol: #ff9a4d;
+    --whale: #ff5c8a;
+    --sniper: #b88dff;
+    --smartw: #4dffa6;
+    --highiq: #ffeb70;
+    --early: #6dc6ff;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif; }
@@ -134,6 +140,29 @@
   .tier-dot.smart { background: var(--smart); }
   .tier-dot.cross-token { background: var(--cross); }
   .tier-dot.profit-only { background: var(--warn); }
+  .tier-dot.labeled { background: var(--kol); box-shadow: 0 0 6px var(--kol); }
+
+  .label-pill {
+    display: inline-block;
+    padding: 1px 6px;
+    margin-left: 4px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    vertical-align: middle;
+  }
+  .label-pill.KOL { background: rgba(255,154,77,0.18); color: var(--kol); border: 1px solid rgba(255,154,77,0.4); }
+  .label-pill.Whale { background: rgba(255,92,138,0.18); color: var(--whale); border: 1px solid rgba(255,92,138,0.4); }
+  .label-pill.Sniper { background: rgba(184,141,255,0.18); color: var(--sniper); border: 1px solid rgba(184,141,255,0.4); }
+  .label-pill.SmartW { background: rgba(77,255,166,0.14); color: var(--smartw); border: 1px solid rgba(77,255,166,0.36); }
+  .label-pill.SmartPF { background: rgba(77,255,166,0.10); color: var(--smartw); border: 1px solid rgba(77,255,166,0.28); }
+  .label-pill.HighIQ { background: rgba(255,235,112,0.14); color: var(--highiq); border: 1px solid rgba(255,235,112,0.4); }
+  .label-pill.Early { background: rgba(109,198,255,0.14); color: var(--early); border: 1px solid rgba(109,198,255,0.4); }
+  .label-pill.JP { background: rgba(255,92,138,0.10); color: var(--whale); border: 1px solid rgba(255,92,138,0.28); }
+  .label-pill.Side { background: rgba(184,141,255,0.10); color: var(--sniper); border: 1px solid rgba(184,141,255,0.24); }
+  .label-pill.Tagged { background: rgba(138,147,166,0.14); color: var(--muted); border: 1px solid rgba(138,147,166,0.34); }
   .trader-meta { display: flex; flex-direction: column; min-width: 0; }
   .trader-addr { font-family: 'SF Mono', ui-monospace, Menlo, monospace; cursor: pointer; color: var(--text); }
   .trader-addr:hover { color: var(--accent); }
@@ -177,12 +206,18 @@
 <body>
 <header>
   <h1>Smart Money <span>Mirror</span></h1>
-  <p class="tag">Find Solana smart-money wallets early to rotations — cross-referenced from Birdeye top traders across every trending token.</p>
+  <p class="tag">Find Solana smart-money wallets early to rotations — cross-referenced from Birdeye top traders against a curated database of <span id="db-size">700+</span> labeled KOLs, whales, snipers, and historically profitable wallets.</p>
   <p class="built">Built with <a href="https://birdeye.so" target="_blank" rel="noopener">@birdeye_data</a> API · <a id="repo-link" href="https://github.com/0xdungki/smart-money-mirror" target="_blank" rel="noopener">GitHub</a></p>
 </header>
 
 <div class="container">
   <div class="summary-row" id="summary"></div>
+
+  <div class="section-title" id="kol-section" style="display:none">
+    <h2>🎯 KOL Convergence — labeled wallets buying NOW</h2>
+    <div class="legend">2+ KOLs hitting same token in last 48h</div>
+  </div>
+  <div class="grid" id="kol-grid" style="display:none"></div>
 
   <div class="section-title">
     <h2>Trending tokens — by smart-money signal</h2>
@@ -251,21 +286,73 @@ async function load() {
   const res = await fetch('data.json?ts=' + Date.now());
   DATA = await res.json();
   renderSummary();
+  renderKolConvergence();
   renderGrid();
   renderWallets();
   document.getElementById('generated-at').textContent = new Date(DATA.summary.generatedAt).toLocaleString();
 }
 
+function renderKolConvergence() {
+  const k = DATA.kolConvergence;
+  if (!k || !k.tokens || !k.tokens.length) return;
+  document.getElementById('kol-section').style.display = '';
+  const grid = document.getElementById('kol-grid');
+  grid.style.display = '';
+  grid.innerHTML = k.tokens.map(t => {
+    const buyers = (t.buyersList || []).slice(0, 8);
+    const sellers = (t.sellersList || []).slice(0, 4);
+    const net = t.netVolume;
+    const heat = t.uniqueBuyers >= 4 ? 'hot' : t.uniqueBuyers >= 2 ? 'warm' : 'cold';
+    const ts = t.latestTs ? new Date(t.latestTs * 1000).toLocaleString() : '';
+    return `
+    <div class="card signal-${heat}">
+      <div class="card-head">
+        <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--kol),var(--whale));display:flex;align-items:center;justify-content:center;font-weight:700;color:#1a0d05">${(t.tokenSymbol || '?').slice(0,2).toUpperCase()}</div>
+        <div class="titles">
+          <div class="sym">${(t.tokenSymbol || '?').replace(/</g,'&lt;')}</div>
+          <div class="name">${t.uniqueBuyers} KOL buyers · ${t.uniqueSellers} sellers · last: ${ts}</div>
+        </div>
+        <span class="badge ${heat}">${heat === 'hot' ? '🔥 hot' : heat}</span>
+      </div>
+      <div class="stats-2">
+        <div class="kv"><span class="k">Buy vol</span><span class="v up">+${fmtUsd(t.buyVolume)}</span></div>
+        <div class="kv"><span class="k">Sell vol</span><span class="v ${t.sellVolume > 0 ? 'down' : ''}">${t.sellVolume > 0 ? '-'+fmtUsd(t.sellVolume) : '$0'}</span></div>
+        <div class="kv"><span class="k">Net flow</span><span class="v ${net >= 0 ? 'up' : 'down'}">${net >= 0 ? '+' : '-'}${fmtUsd(Math.abs(net))}</span></div>
+        <div class="kv"><span class="k">Buy txs</span><span class="v">${t.buyCount}</span></div>
+      </div>
+      <div class="traders-list">
+        ${buyers.map(b => `
+          <div class="trader-row" title="Bought $${b.volumeUsd.toFixed(0)}">
+            <span class="tier-dot labeled"></span>
+            <div class="trader-meta">
+              <span class="trader-addr" data-addr="${b.owner}" onclick="copyAddr(this)">${b.label.replace(/</g,'&lt;')}<span class="label-pill ${b.category}">${b.category}</span></span>
+            </div>
+            <span class="trader-pnl up">+${fmtUsd(b.volumeUsd)}</span>
+          </div>
+        `).join('')}
+        ${sellers.length ? `<div style="font-size:10px;color:var(--muted);padding-top:6px;border-top:1px solid var(--border);margin-top:4px">↓ Sellers: ${sellers.map(s => s.label).join(', ')}</div>` : ''}
+      </div>
+      <div class="footer-link">
+        <a href="https://birdeye.so/token/${t.tokenAddress}?chain=solana" target="_blank" rel="noopener">Birdeye →</a>
+        <a href="https://dexscreener.com/solana/${t.tokenAddress}" target="_blank" rel="noopener">Dexscreener →</a>
+        <span class="copy" data-addr="${t.tokenAddress}" onclick="copyAddr(this)">Copy CA</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 function renderSummary() {
   const s = DATA.summary;
+  document.getElementById('db-size').textContent = (s.labelDbSize || 0).toLocaleString();
   const cards = [
     { label: 'Tokens scanned', val: s.totalTokensScanned, cls: '' },
     { label: 'Total wallets', val: fmt(s.totalWallets, 0), cls: 'info' },
+    { label: 'Labeled hits', val: s.labeledTraders || 0, cls: 'warn' },
+    { label: 'KOL hits', val: s.kolHits || 0, cls: 'warn' },
+    { label: 'Whale hits', val: s.whaleHits || 0, cls: 'warn' },
     { label: 'Multi-token wallets', val: s.multiTokenWallets, cls: 'info' },
     { label: 'Alpha wallets', val: s.alphaWallets, cls: 'accent' },
-    { label: 'Smart wallets', val: s.smartWallets, cls: 'accent' },
     { label: 'Hot tokens', val: s.hotTokens, cls: 'warn' },
-    { label: 'Warm tokens', val: s.warmTokens, cls: 'warn' },
     { label: 'Smart-money PnL', val: fmtUsd(s.totalSmartPnl), cls: 'accent' }
   ];
   document.getElementById('summary').innerHTML = cards.map(c =>
@@ -301,19 +388,22 @@ function renderGrid() {
         <div class="kv"><span class="k">24h</span><span class="v ${t.price24hChangePercent >= 0 ? 'up' : 'down'}">${t.price24hChangePercent >= 0 ? '+' : ''}${fmt(t.price24hChangePercent, 1)}%</span></div>
         <div class="kv"><span class="k">Vol 24h</span><span class="v">${fmtUsd(t.volume24hUSD)}</span></div>
         <div class="kv"><span class="k">Liq</span><span class="v">${fmtUsd(t.liquidity)}</span></div>
-        <div class="kv"><span class="k">Alpha</span><span class="v" style="color:var(--alpha)">${t.alphaCount}</span></div>
-        <div class="kv"><span class="k">Smart</span><span class="v" style="color:var(--smart)">${t.smartCount}</span></div>
+        <div class="kv"><span class="k">Labeled</span><span class="v" style="color:var(--kol)">${t.labeledCount || 0}${t.kolCount ? ' · '+t.kolCount+' KOL' : ''}${t.whaleCount ? ' · '+t.whaleCount+' whale' : ''}</span></div>
+        <div class="kv"><span class="k">Cross-tok</span><span class="v" style="color:var(--cross)">${t.crossCount || 0}</span></div>
       </div>
       <div class="traders-list">
-        ${t.traders.slice(0, 6).map(tr => `
-          <div class="trader-row" title="Score ${tr.score} · ${tr.tradeBuy} buys / ${tr.tradeSell} sells">
-            <span class="tier-dot ${tr.tier}"></span>
+        ${t.traders.slice(0, 6).map(tr => {
+          const labelHtml = tr.label ? `<span class="label-pill ${tr.category}" title="${tr.label}${tr.winrate?' · WR '+tr.winrate+'%':''}${tr.realizedProfit30d?' · 30d '+fmtUsd(tr.realizedProfit30d):''}">${tr.category}${tr.winrate?' '+Math.round(tr.winrate)+'%':''}</span>` : '';
+          const dotTier = tr.label ? 'labeled' : tr.tier;
+          return `
+          <div class="trader-row" title="${tr.label || ''}${tr.label?' · ':''}Score ${tr.score} · ${tr.tradeBuy} buys / ${tr.tradeSell} sells">
+            <span class="tier-dot ${dotTier}"></span>
             <div class="trader-meta">
-              <span class="trader-addr" data-addr="${tr.owner}" onclick="copyAddr(this)">${tr.ownerShort}${tr.crossTokens.length ? ' <span class="trader-tag" style="margin-left:4px">also: ' + tr.crossTokens.slice(0, 3).join(', ') + '</span>' : ''}</span>
+              <span class="trader-addr" data-addr="${tr.owner}" onclick="copyAddr(this)">${tr.label ? tr.label.replace(/</g,'&lt;') : tr.ownerShort}${labelHtml}${tr.crossTokens.length ? '<span class="trader-tag" style="margin-left:4px">also: ' + tr.crossTokens.slice(0, 3).join(', ') + '</span>' : ''}</span>
             </div>
             <span class="trader-pnl ${tr.traderPnl > 0 ? 'up' : tr.traderPnl < 0 ? 'down' : 'flat'}">${tr.traderPnl >= 0 ? '+' : ''}${fmtUsd(tr.traderPnl)}</span>
-          </div>
-        `).join('')}
+          </div>`;
+        }).join('')}
       </div>
       <div class="footer-link">
         <a href="https://birdeye.so/token/${t.address}?chain=solana" target="_blank" rel="noopener">Birdeye →</a>
@@ -326,19 +416,22 @@ function renderGrid() {
 
 function renderWallets() {
   const tbody = document.getElementById('wallets-body');
-  const rows = (DATA.topWallets || []).slice(0, 30);
-  tbody.innerHTML = rows.map((w, i) => `
+  const rows = (DATA.topWallets || []).slice(0, 40);
+  tbody.innerHTML = rows.map((w, i) => {
+    const labelHtml = w.label ? `<span class="label-pill ${w.category}">${w.category}</span> <span style="color:var(--text);font-weight:500">${w.label.replace(/</g,'&lt;')}</span>` : `<span class="tier-pill ${w.tier}">${w.tier}</span>`;
+    const wr = w.winrate ? `<div style="color:var(--muted);font-size:11px;margin-top:2px">WR ${Math.round(w.winrate)}% · 30d ${fmtUsd(w.realizedProfit30d || 0)}</div>` : '';
+    return `
     <tr>
       <td>${i + 1}</td>
-      <td><a href="https://birdeye.so/profile/${w.owner}?chain=solana" target="_blank" rel="noopener">${w.ownerShort}</a> <span class="copy" data-addr="${w.owner}" onclick="copyAddr(this)" title="Copy wallet">⧉</span></td>
-      <td><span class="tier-pill ${w.tier}">${w.tier}</span></td>
+      <td><a href="https://birdeye.so/profile/${w.owner}?chain=solana" target="_blank" rel="noopener">${w.ownerShort}</a> <span class="copy" data-addr="${w.owner}" onclick="copyAddr(this)" title="Copy wallet">⧉</span>${wr}</td>
+      <td>${labelHtml}</td>
       <td class="num">${w.score}</td>
       <td class="num">${w.tokenCount}</td>
       <td class="num" style="color:${w.totalPnl >= 0 ? 'var(--accent)' : 'var(--danger)'}">${w.totalPnl >= 0 ? '+' : ''}${fmtUsd(w.totalPnl)}</td>
       <td class="num">${fmtUsd(w.totalVolume)}</td>
       <td><div class="toks">${w.appearances.map(a => `<span title="${a.symbol} · PnL ${fmtUsd(a.traderPnl)}">${a.symbol}</span>`).join('')}</div></td>
-    </tr>
-  `).join('');
+    </tr>`;
+  }).join('');
 }
 
 function copyAddr(el) {
